@@ -2,7 +2,10 @@ package lightsocks
 
 import (
 	"encoding/binary"
+	"fmt"
+	"log"
 	"net"
+	"time"
 )
 
 type LsServer struct {
@@ -36,9 +39,13 @@ func (lsServer *LsServer) Listen(didListen func(listenAddr net.Addr)) error {
 	return ListenSecureTCP(lsServer.ListenAddr, lsServer.Cipher, lsServer.handleConn, didListen)
 }
 
+var couu int
+
 // 解 SOCKS5 协议
 // https://www.ietf.org/rfc/rfc1928.txt
 func (lsServer *LsServer) handleConn(localConn *SecureTCPConn) {
+	couu++
+	fmt.Println(couu)
 	defer localConn.Close()
 	buf := make([]byte, 256)
 
@@ -60,7 +67,6 @@ func (lsServer *LsServer) handleConn(localConn *SecureTCPConn) {
 	if err != nil || buf[0] != 0x05 {
 		return
 	}
-
 	/**
 	   The dstServer selects from one of the methods given in METHODS, and
 	   sends a METHOD selection message:
@@ -120,7 +126,7 @@ func (lsServer *LsServer) handleConn(localConn *SecureTCPConn) {
 		IP:   dIP,
 		Port: int(binary.BigEndian.Uint16(dPort)),
 	}
-
+	//log.Println(time.Now(), dstAddr)
 	// 连接真正的远程服务
 	dstServer, err := net.DialTCP("tcp", nil, dstAddr)
 	if err != nil {
@@ -146,6 +152,8 @@ func (lsServer *LsServer) handleConn(localConn *SecureTCPConn) {
 	// 从 localUser 读取数据发送到 dstServer
 	go func() {
 		err := localConn.DecodeCopy(dstServer)
+		//log.Println(dstServer.LocalAddr())
+		log.Println(time.Now(), "目标地址：", dstServer.RemoteAddr(), "源地址：", localConn.Address)
 		if err != nil {
 			// 在 copy 的过程中可能会存在网络超时等 error 被 return，只要有一个发生了错误就退出本次工作
 			localConn.Close()
@@ -155,6 +163,7 @@ func (lsServer *LsServer) handleConn(localConn *SecureTCPConn) {
 	// 从 dstServer 读取数据发送到 localUser，这里因为处在翻墙阶段出现网络错误的概率更大
 	(&SecureTCPConn{
 		Cipher:          localConn.Cipher,
+		Address:         dstServer.RemoteAddr(),
 		ReadWriteCloser: dstServer,
-	}).EncodeCopy(localConn)
+	}).EncodeCopyServer(localConn)
 }

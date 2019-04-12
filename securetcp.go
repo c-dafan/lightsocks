@@ -4,16 +4,23 @@ import (
 	"io"
 	"log"
 	"net"
+	"time"
 )
 
 const (
 	bufSize = 1024
 )
 
+type Addr interface {
+	Network() string // name of the network (for example, "tcp", "udp")
+	String() string  // string form of address (for example, "192.0.2.1:25", "[2001:db8::1]:80")
+}
+
 // 加密传输的 TCP Socket
 type SecureTCPConn struct {
 	io.ReadWriteCloser
-	Cipher *cipher
+	Address Addr
+	Cipher  *cipher
 }
 
 // 从输入流里读取加密过的数据，解密后把原数据放到bs里
@@ -30,6 +37,11 @@ func (secureSocket *SecureTCPConn) DecodeRead(bs []byte) (n int, err error) {
 func (secureSocket *SecureTCPConn) EncodeWrite(bs []byte) (int, error) {
 	secureSocket.Cipher.encode(bs)
 	return secureSocket.Write(bs)
+}
+
+func (secureSocket *SecureTCPConn) EncodeCopyServer(dst *SecureTCPConn) error {
+	log.Println(time.Now(), "目标地址：", dst.Address, "源地址：", secureSocket.Address)
+	return secureSocket.EncodeCopy(dst)
 }
 
 // 从src中源源不断的读取原数据加密后写入到dst，直到src中没有数据可以再读取
@@ -110,6 +122,10 @@ func ListenSecureTCP(laddr *net.TCPAddr, cipher *cipher, handleConn func(localCo
 
 	for {
 		localConn, err := listener.AcceptTCP()
+
+		//log.Println("remote: ",localConn.RemoteAddr())
+		//log.Println("local: ",localConn.LocalAddr())
+
 		if err != nil {
 			log.Println(err)
 			continue
@@ -118,6 +134,7 @@ func ListenSecureTCP(laddr *net.TCPAddr, cipher *cipher, handleConn func(localCo
 		localConn.SetLinger(0)
 		go handleConn(&SecureTCPConn{
 			ReadWriteCloser: localConn,
+			Address:         localConn.RemoteAddr(),
 			Cipher:          cipher,
 		})
 	}

@@ -1,6 +1,7 @@
 package lightsocks
 
 import (
+	"fmt"
 	"log"
 	"net"
 )
@@ -42,16 +43,18 @@ func (local *LsLocal) Listen(didListen func(listenAddr net.Addr)) error {
 	return ListenSecureTCP(local.ListenAddr, local.Cipher, local.handleConn, didListen)
 }
 
-func (local *LsLocal) handleConn(userConn *SecureTCPConn) {
-	defer userConn.Close()
+var cou int
 
+func (local *LsLocal) handleConn(userConn *SecureTCPConn) {
+	cou++
+	defer userConn.Close()
+	fmt.Println(cou)
 	proxyServer, err := DialTCPSecure(local.RemoteAddr, local.Cipher)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 	defer proxyServer.Close()
-
 	// Conn被关闭时直接清除所有数据 不管没有发送的数据
 	//proxyServer.SetLinger(0)
 

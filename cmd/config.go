@@ -33,8 +33,11 @@ func init() {
 }
 
 // 保存配置到配置文件
-func (config *Config) SaveConfig() {
+func (config *Config) SaveConfig(configPath2 interface{}) {
 	configJson, _ := json.MarshalIndent(config, "", "	")
+	if configPath2 != nil {
+		configPath = configPath2.(string)
+	}
 	err := ioutil.WriteFile(configPath, configJson, 0644)
 	if err != nil {
 		fmt.Errorf("保存配置到文件 %s 出错: %s", configPath, err)
@@ -42,7 +45,7 @@ func (config *Config) SaveConfig() {
 	log.Printf("保存配置到文件 %s 成功\n", configPath)
 }
 
-func (config *Config) ReadConfig() {
+func (config *Config) ReadConfig(configPath string) {
 	// 如果配置文件存在，就读取配置文件中的配置 assign 到 config
 	if _, err := os.Stat(configPath); !os.IsNotExist(err) {
 		log.Printf("从文件 %s 中读取配置\n", configPath)
