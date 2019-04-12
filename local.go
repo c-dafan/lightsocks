@@ -1,7 +1,6 @@
 package lightsocks
 
 import (
-	"fmt"
 	"log"
 	"net"
 )
@@ -43,12 +42,9 @@ func (local *LsLocal) Listen(didListen func(listenAddr net.Addr)) error {
 	return ListenSecureTCP(local.ListenAddr, local.Cipher, local.handleConn, didListen)
 }
 
-var cou int
-
 func (local *LsLocal) handleConn(userConn *SecureTCPConn) {
-	cou++
+
 	defer userConn.Close()
-	fmt.Println(cou)
 	proxyServer, err := DialTCPSecure(local.RemoteAddr, local.Cipher)
 	if err != nil {
 		log.Println(err)

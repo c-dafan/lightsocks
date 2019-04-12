@@ -2,7 +2,6 @@ package lightsocks
 
 import (
 	"encoding/binary"
-	"fmt"
 	"log"
 	"net"
 	"time"
@@ -39,13 +38,9 @@ func (lsServer *LsServer) Listen(didListen func(listenAddr net.Addr)) error {
 	return ListenSecureTCP(lsServer.ListenAddr, lsServer.Cipher, lsServer.handleConn, didListen)
 }
 
-var couu int
-
 // 解 SOCKS5 协议
 // https://www.ietf.org/rfc/rfc1928.txt
 func (lsServer *LsServer) handleConn(localConn *SecureTCPConn) {
-	couu++
-	fmt.Println(couu)
 	defer localConn.Close()
 	buf := make([]byte, 256)
 
