@@ -57,7 +57,7 @@ func (local *LsLocal) handleConn(userConn *SecureTCPConn) {
 	// 进行转发
 	// 从 proxyServer 读取数据发送到 localUser
 	go func() {
-		err := proxyServer.DecodeCopy(userConn)
+		_, err := proxyServer.DecodeCopy(userConn)
 		if err != nil {
 			// 在 copy 的过程中可能会存在网络超时等 error 被 return，只要有一个发生了错误就退出本次工作
 			userConn.Close()

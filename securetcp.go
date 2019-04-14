@@ -40,20 +40,23 @@ func (secureSocket *SecureTCPConn) EncodeWrite(bs []byte) (int, error) {
 }
 
 func (secureSocket *SecureTCPConn) EncodeCopyServer(dst *SecureTCPConn) error {
-	log.Println(time.Now(), "目标地址：", dst.Address, "源地址：", secureSocket.Address)
-	return secureSocket.EncodeCopy(dst)
+	byteSize, err := secureSocket.EncodeCopy(dst)
+	log.Println(time.Now(), "目标地址：", dst.Address, "源地址：", secureSocket.Address, "大小:", byteSize)
+	return err
 }
 
 // 从src中源源不断的读取原数据加密后写入到dst，直到src中没有数据可以再读取
-func (secureSocket *SecureTCPConn) EncodeCopy(dst io.ReadWriteCloser) error {
+func (secureSocket *SecureTCPConn) EncodeCopy(dst io.ReadWriteCloser) (int, error) {
 	buf := make([]byte, bufSize)
+	lastCount := 0
+	byteSize := 0
 	for {
 		readCount, errRead := secureSocket.Read(buf)
 		if errRead != nil {
 			if errRead != io.EOF {
-				return errRead
+				return 0, errRead
 			} else {
-				return nil
+				return (byteSize-1)*bufSize + lastCount, nil
 			}
 		}
 		if readCount > 0 {
@@ -62,36 +65,42 @@ func (secureSocket *SecureTCPConn) EncodeCopy(dst io.ReadWriteCloser) error {
 				Cipher:          secureSocket.Cipher,
 			}).EncodeWrite(buf[0:readCount])
 			if errWrite != nil {
-				return errWrite
+				return 0, errWrite
 			}
 			if readCount != writeCount {
-				return io.ErrShortWrite
+				return 0, io.ErrShortWrite
 			}
 		}
+		byteSize++
+		lastCount = readCount
 	}
 }
 
 // 从src中源源不断的读取加密后的数据解密后写入到dst，直到src中没有数据可以再读取
-func (secureSocket *SecureTCPConn) DecodeCopy(dst io.Writer) error {
+func (secureSocket *SecureTCPConn) DecodeCopy(dst io.Writer) (int, error) {
 	buf := make([]byte, bufSize)
+	byteSize := 0
+	lastRead := 0
 	for {
 		readCount, errRead := secureSocket.DecodeRead(buf)
 		if errRead != nil {
 			if errRead != io.EOF {
-				return errRead
+				return 0, errRead
 			} else {
-				return nil
+				return (byteSize-1)*bufSize + lastRead, nil
 			}
 		}
 		if readCount > 0 {
 			writeCount, errWrite := dst.Write(buf[0:readCount])
 			if errWrite != nil {
-				return errWrite
+				return 0, errWrite
 			}
 			if readCount != writeCount {
-				return io.ErrShortWrite
+				return 0, io.ErrShortWrite
 			}
 		}
+		byteSize++
+		lastRead = readCount
 	}
 }
 

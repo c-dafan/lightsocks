@@ -146,9 +146,9 @@ func (lsServer *LsServer) handleConn(localConn *SecureTCPConn) {
 	// 进行转发
 	// 从 localUser 读取数据发送到 dstServer
 	go func() {
-		err := localConn.DecodeCopy(dstServer)
+		byteSize, err := localConn.DecodeCopy(dstServer)
 		//log.Println(dstServer.LocalAddr())
-		log.Println(time.Now(), "目标地址：", dstServer.RemoteAddr(), "源地址：", localConn.Address)
+		log.Println(time.Now(), "目标地址：", dstServer.RemoteAddr(), "源地址：", localConn.Address, "大小:", byteSize)
 		if err != nil {
 			// 在 copy 的过程中可能会存在网络超时等 error 被 return，只要有一个发生了错误就退出本次工作
 			localConn.Close()
