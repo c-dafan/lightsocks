@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	l4g "github.com/alecthomas/log4go"
 	"github.com/c-dafan/lightsocks"
 	"github.com/c-dafan/lightsocks/cmd"
 	"github.com/phayes/freeport"
@@ -28,7 +29,8 @@ func main() {
 	}
 	config.ReadConfig("server.json")
 	config.SaveConfig("server.json")
-
+	l4g.LoadConfiguration("example.xml")
+	defer l4g.Close()
 	// 启动 server 端并监听
 	lsServer, err := lightsocks.NewLsServer(config.Password, config.ListenAddr)
 	if err != nil {

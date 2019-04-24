@@ -1,6 +1,7 @@
 package lightsocks
 
 import (
+	l4g "github.com/alecthomas/log4go"
 	"io"
 	"log"
 	"net"
@@ -40,35 +41,44 @@ func (secureSocket *SecureTCPConn) EncodeWrite(bs []byte) (int, error) {
 }
 
 func (secureSocket *SecureTCPConn) EncodeCopyServer(dst *SecureTCPConn) error {
-	byteSize, err := secureSocket.EncodeCopy(dst)
-	log.Println(time.Now(), "目标地址：", dst.Address, "源地址：", secureSocket.Address, "大小:", byteSize)
+	byteSize, _, err := secureSocket.EncodeCopy(dst)
+	//tagCoder := mahonia.NewDecoder("utf-8")
+	//_, cdata, _ := tagCoder.Translate([]byte(content), true)
+	//result := string(cdata)
+	//log.Println(time.Now(), "目标地址：", dst.Address, "源地址：", secureSocket.Address, "大小:", byteSize,
+	//	"内容:")
+	l4g.Info("%s,%s,%s,%d", time.Now().String()[:27], dst.Address.String(),
+		secureSocket.Address.String(), byteSize)
 	return err
 }
 
 // 从src中源源不断的读取原数据加密后写入到dst，直到src中没有数据可以再读取
-func (secureSocket *SecureTCPConn) EncodeCopy(dst io.ReadWriteCloser) (int, error) {
+func (secureSocket *SecureTCPConn) EncodeCopy(dst io.ReadWriteCloser) (int, string, error) {
 	buf := make([]byte, bufSize)
 	lastCount := 0
 	byteSize := 0
+	str := ""
 	for {
 		readCount, errRead := secureSocket.Read(buf)
 		if errRead != nil {
 			if errRead != io.EOF {
-				return 0, errRead
+				return 0, "", errRead
 			} else {
-				return (byteSize-1)*bufSize + lastCount, nil
+				return (byteSize-1)*bufSize + lastCount, str, nil
 			}
 		}
 		if readCount > 0 {
+
+			str += string(buf[0:readCount])
 			writeCount, errWrite := (&SecureTCPConn{
 				ReadWriteCloser: dst,
 				Cipher:          secureSocket.Cipher,
 			}).EncodeWrite(buf[0:readCount])
 			if errWrite != nil {
-				return 0, errWrite
+				return 0, "", errWrite
 			}
 			if readCount != writeCount {
-				return 0, io.ErrShortWrite
+				return 0, "", io.ErrShortWrite
 			}
 		}
 		byteSize++
@@ -77,26 +87,28 @@ func (secureSocket *SecureTCPConn) EncodeCopy(dst io.ReadWriteCloser) (int, erro
 }
 
 // 从src中源源不断的读取加密后的数据解密后写入到dst，直到src中没有数据可以再读取
-func (secureSocket *SecureTCPConn) DecodeCopy(dst io.Writer) (int, error) {
+func (secureSocket *SecureTCPConn) DecodeCopy(dst io.Writer) (int, string, error) {
 	buf := make([]byte, bufSize)
+	str := ""
 	byteSize := 0
 	lastRead := 0
 	for {
 		readCount, errRead := secureSocket.DecodeRead(buf)
+		str += string(buf[:readCount])
 		if errRead != nil {
 			if errRead != io.EOF {
-				return 0, errRead
+				return 0, "", errRead
 			} else {
-				return (byteSize-1)*bufSize + lastRead, nil
+				return (byteSize-1)*bufSize + lastRead, str, nil
 			}
 		}
 		if readCount > 0 {
 			writeCount, errWrite := dst.Write(buf[0:readCount])
 			if errWrite != nil {
-				return 0, errWrite
+				return 0, "", errWrite
 			}
 			if readCount != writeCount {
-				return 0, io.ErrShortWrite
+				return 0, "", io.ErrShortWrite
 			}
 		}
 		byteSize++

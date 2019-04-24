@@ -15,6 +15,7 @@ const (
 var version = "master"
 
 func main() {
+
 	log.SetFlags(log.Lshortfile)
 
 	// 默认配置

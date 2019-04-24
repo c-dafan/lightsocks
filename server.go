@@ -2,7 +2,8 @@ package lightsocks
 
 import (
 	"encoding/binary"
-	"log"
+	l4g "github.com/alecthomas/log4go"
+	"github.com/axgle/mahonia"
 	"net"
 	"time"
 )
@@ -43,7 +44,6 @@ func (lsServer *LsServer) Listen(didListen func(listenAddr net.Addr)) error {
 func (lsServer *LsServer) handleConn(localConn *SecureTCPConn) {
 	defer localConn.Close()
 	buf := make([]byte, 256)
-
 	/**
 	   The localConn connects to the dstServer, and sends a ver
 	   identifier/method selection message:
@@ -57,11 +57,12 @@ func (lsServer *LsServer) handleConn(localConn *SecureTCPConn) {
 	   appear in the METHODS field.
 	*/
 	// 第一个字段VER代表Socks的版本，Socks5默认为0x05，其固定长度为1个字节
-	_, err := localConn.DecodeRead(buf)
+	n, err := localConn.DecodeRead(buf)
 	// 只支持版本5
 	if err != nil || buf[0] != 0x05 {
 		return
 	}
+
 	/**
 	   The dstServer selects from one of the methods given in METHODS, and
 	   sends a METHOD selection message:
@@ -84,7 +85,7 @@ func (lsServer *LsServer) handleConn(localConn *SecureTCPConn) {
 	*/
 
 	// 获取真正的远程服务的地址
-	n, err := localConn.DecodeRead(buf)
+	n, err = localConn.DecodeRead(buf)
 	// n 最短的长度为7 情况为 ATYP=3 DST.ADDR占用1字节 值为0x0
 	if err != nil || n < 7 {
 		return
@@ -146,9 +147,14 @@ func (lsServer *LsServer) handleConn(localConn *SecureTCPConn) {
 	// 进行转发
 	// 从 localUser 读取数据发送到 dstServer
 	go func() {
-		byteSize, err := localConn.DecodeCopy(dstServer)
+		byteSize, _, err := localConn.DecodeCopy(dstServer)
 		//log.Println(dstServer.LocalAddr())
-		log.Println(time.Now(), "目标地址：", dstServer.RemoteAddr(), "源地址：", localConn.Address, "大小:", byteSize)
+		//tagCoder := mahonia.NewDecoder("gbk")
+		//_, cdata, _ := tagCoder.Translate([]byte(content), true)
+		l4g.Info("%s,%s,%s,%d", time.Now().String()[:27], dstServer.RemoteAddr().String(),
+			dstServer.LocalAddr().String(), byteSize)
+		//log.Println(time.Now(), "目标地址：", dstServer.RemoteAddr(), "源地址：", dstServer.LocalAddr(), "大小:",
+		//	byteSize,"内容:",content)
 		if err != nil {
 			// 在 copy 的过程中可能会存在网络超时等 error 被 return，只要有一个发生了错误就退出本次工作
 			localConn.Close()
@@ -161,4 +167,13 @@ func (lsServer *LsServer) handleConn(localConn *SecureTCPConn) {
 		Address:         dstServer.RemoteAddr(),
 		ReadWriteCloser: dstServer,
 	}).EncodeCopyServer(localConn)
+}
+
+func ConvertToString(src string, srcCode string, tagCode string) string {
+	srcCoder := mahonia.NewDecoder(srcCode)
+	srcResult := srcCoder.ConvertString(src)
+	tagCoder := mahonia.NewDecoder(tagCode)
+	_, cdata, _ := tagCoder.Translate([]byte(srcResult), true)
+	result := string(cdata)
+	return result
 }
