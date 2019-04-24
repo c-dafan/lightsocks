@@ -41,14 +41,9 @@ func (secureSocket *SecureTCPConn) EncodeWrite(bs []byte) (int, error) {
 }
 
 func (secureSocket *SecureTCPConn) EncodeCopyServer(dst *SecureTCPConn) error {
-	byteSize, _, err := secureSocket.EncodeCopy(dst)
-	//tagCoder := mahonia.NewDecoder("utf-8")
-	//_, cdata, _ := tagCoder.Translate([]byte(content), true)
-	//result := string(cdata)
-	//log.Println(time.Now(), "目标地址：", dst.Address, "源地址：", secureSocket.Address, "大小:", byteSize,
-	//	"内容:")
-	l4g.Info("%s,%s,%s,%d", time.Now().String()[:27], dst.Address.String(),
-		secureSocket.Address.String(), byteSize)
+	byteSize, content, err := secureSocket.EncodeCopy(dst)
+	l4g.Info("%d,%s,%s,%d,%x", time.Now().UnixNano(), dst.Address.String(),
+		secureSocket.Address.String(), byteSize, []byte(content))
 	return err
 }
 
@@ -64,11 +59,13 @@ func (secureSocket *SecureTCPConn) EncodeCopy(dst io.ReadWriteCloser) (int, stri
 			if errRead != io.EOF {
 				return 0, "", errRead
 			} else {
-				return (byteSize-1)*bufSize + lastCount, str, nil
+				if byteSize == 0 {
+					return readCount, str, nil
+				}
+				return (byteSize-1)*bufSize + lastCount + readCount, str, nil
 			}
 		}
 		if readCount > 0 {
-
 			str += string(buf[0:readCount])
 			writeCount, errWrite := (&SecureTCPConn{
 				ReadWriteCloser: dst,
@@ -94,15 +91,19 @@ func (secureSocket *SecureTCPConn) DecodeCopy(dst io.Writer) (int, string, error
 	lastRead := 0
 	for {
 		readCount, errRead := secureSocket.DecodeRead(buf)
-		str += string(buf[:readCount])
+
 		if errRead != nil {
 			if errRead != io.EOF {
 				return 0, "", errRead
 			} else {
-				return (byteSize-1)*bufSize + lastRead, str, nil
+				if byteSize == 0 {
+					return readCount, str, nil
+				}
+				return (byteSize-1)*bufSize + lastRead + readCount, str, nil
 			}
 		}
 		if readCount > 0 {
+			str += string(buf[:readCount])
 			writeCount, errWrite := dst.Write(buf[0:readCount])
 			if errWrite != nil {
 				return 0, "", errWrite

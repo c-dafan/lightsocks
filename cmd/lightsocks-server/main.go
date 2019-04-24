@@ -8,13 +8,22 @@ import (
 	"github.com/phayes/freeport"
 	"log"
 	"net"
+	"os"
 )
 
 var version = "master"
 
 func main() {
 	log.SetFlags(log.Lshortfile)
-
+	err := os.Mkdir("logs", os.ModePerm)
+	if err != nil {
+		if !os.IsExist(err) {
+			err = os.Mkdir("logs", os.ModePerm)
+			if err != nil {
+				return
+			}
+		}
+	}
 	// 服务端监听端口随机生成
 	port, err := freeport.GetFreePort()
 	if err != nil {

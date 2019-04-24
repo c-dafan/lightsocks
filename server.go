@@ -3,7 +3,6 @@ package lightsocks
 import (
 	"encoding/binary"
 	l4g "github.com/alecthomas/log4go"
-	"github.com/axgle/mahonia"
 	"net"
 	"time"
 )
@@ -147,18 +146,21 @@ func (lsServer *LsServer) handleConn(localConn *SecureTCPConn) {
 	// 进行转发
 	// 从 localUser 读取数据发送到 dstServer
 	go func() {
-		byteSize, _, err := localConn.DecodeCopy(dstServer)
-		//log.Println(dstServer.LocalAddr())
-		//tagCoder := mahonia.NewDecoder("gbk")
-		//_, cdata, _ := tagCoder.Translate([]byte(content), true)
-		l4g.Info("%s,%s,%s,%d", time.Now().String()[:27], dstServer.RemoteAddr().String(),
-			dstServer.LocalAddr().String(), byteSize)
-		//log.Println(time.Now(), "目标地址：", dstServer.RemoteAddr(), "源地址：", dstServer.LocalAddr(), "大小:",
-		//	byteSize,"内容:",content)
+		byteSize, content, err := localConn.DecodeCopy(dstServer)
 		if err != nil {
 			// 在 copy 的过程中可能会存在网络超时等 error 被 return，只要有一个发生了错误就退出本次工作
 			localConn.Close()
 			dstServer.Close()
+		} else {
+			//if strings.Split(dstServer.RemoteAddr().String(),":")[1] == "443"{
+			//			//	l4g.Info("%d,%s,%s,%d,%x", time.Now().UnixNano(), dstServer.RemoteAddr().String(),
+			//			//		dstServer.LocalAddr().String(), byteSize, content)
+			//			//}else {
+			//			//	l4g.Info("%d,%s,%s,%d,\"%s\"", time.Now().UnixNano(), dstServer.RemoteAddr().String(),
+			//			//		dstServer.LocalAddr().String(), byteSize, content)
+			//			//}
+			l4g.Info("%d,%s,%s,%d,%x", time.Now().UnixNano(), dstServer.RemoteAddr().String(),
+				localConn.Address.String(), byteSize, []byte(content))
 		}
 	}()
 	// 从 dstServer 读取数据发送到 localUser，这里因为处在翻墙阶段出现网络错误的概率更大
@@ -167,13 +169,4 @@ func (lsServer *LsServer) handleConn(localConn *SecureTCPConn) {
 		Address:         dstServer.RemoteAddr(),
 		ReadWriteCloser: dstServer,
 	}).EncodeCopyServer(localConn)
-}
-
-func ConvertToString(src string, srcCode string, tagCode string) string {
-	srcCoder := mahonia.NewDecoder(srcCode)
-	srcResult := srcCoder.ConvertString(src)
-	tagCoder := mahonia.NewDecoder(tagCode)
-	_, cdata, _ := tagCoder.Translate([]byte(srcResult), true)
-	result := string(cdata)
-	return result
 }
